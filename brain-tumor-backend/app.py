@@ -13,7 +13,11 @@ app = Flask(__name__)
 CORS(app)
 
 # Load the trained model
-model = load_model('xception.h5')  # Replace with your actual model path
+try:
+    model = load_model('xception.h5')  # Replace with your actual model path
+except Exception as e:
+    print(f"Error loading model: {e}")
+    exit(1)
 
 # Define your classes (make sure these match your training classes)
 class_names = ['glioma', 'meningioma', 'no_tumor', 'pituitary']  # Example classes, update as necessary
@@ -36,19 +40,33 @@ def predict():
     file = request.files['file']
     
     # Save the uploaded file temporarily
-    temp_path = os.path.join('uploads', file.filename)
-    file.save(temp_path)
+    upload_folder = 'uploads'
+    if not os.path.exists(upload_folder):
+        os.makedirs(upload_folder)  # Ensure 'uploads' directory exists
+    
+    temp_path = os.path.join(upload_folder, file.filename)
+    
+    try:
+        file.save(temp_path)
+    except Exception as e:
+        return jsonify({'error': f'Error saving file: {e}'}), 500
     
     # Preprocess the image and make prediction
-    img_array = preprocess_image(temp_path)
-    prediction = model.predict(img_array)
+    try:
+        img_array = preprocess_image(temp_path)
+        prediction = model.predict(img_array)
+    except Exception as e:
+        return jsonify({'error': f'Error during prediction: {e}'}), 500
     
     # Get class with maximum probability
     predicted_class = class_names[np.argmax(prediction)]
     confidence = float(round(np.max(prediction) * 100, 2))  # Convert to native Python float
     
     # Remove temporary image
-    os.remove(temp_path)
+    try:
+        os.remove(temp_path)
+    except Exception as e:
+        return jsonify({'error': f'Error removing temporary file: {e}'}), 500
     
     # Return the prediction and confidence
     return jsonify({
